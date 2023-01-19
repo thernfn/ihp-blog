@@ -12,6 +12,7 @@ dist
 *.dyn_o
 *.hi
 *.o
+*~
 build
 gen
 del

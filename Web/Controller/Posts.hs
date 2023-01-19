@@ -5,10 +5,13 @@ import Web.View.Posts.Index
 import Web.View.Posts.New
 import Web.View.Posts.Edit
 import Web.View.Posts.Show
+import qualified Text.MMark as MMark
 
 instance Controller PostsController where
     action PostsAction = do
-        posts <- query @Post |> fetch -- fetch (query @Post)
+        posts <- query @Post
+          |> orderByDesc #createdAt -- post order
+          |> fetch -- fetch (query @Post)
         render IndexView { .. } -- shorthand for { posts = posts }
 
     action NewPostAction = do
@@ -22,6 +25,8 @@ instance Controller PostsController where
     -- to get the post id of the given request
     action ShowPostAction { postId } = do
         post <- fetch postId
+                >>= pure . modify #comments (orderByDesc #createdAt)
+                >>= fetchRelated #comments -- also include comments
         render ShowView { .. }
 
     -- /EditPost?postId=postId
@@ -62,6 +67,15 @@ instance Controller PostsController where
 
 buildPost post = post
     |> fill @["title", "body"]
+    |> validateField #title nonEmpty -- every post has at least a title
+    |> validateField #body nonEmpty
+    |> validateField #body isMarkdown
     -- fill @["title", "body"] post
     -- read the title and body attributes from the browser request
     -- and fills them into the post record.
+
+isMarkdown :: Text -> ValidatorResult
+isMarkdown text =
+  case MMark.parse "" text of
+    Left _ -> Failure "Please provide valid Markdown"
+    Right _ -> Success
